@@ -22,23 +22,54 @@ class _EditProductScreenState extends State<EditProductScreen> {
     super.dispose();
   }
 
-  void _saveForm() {
+  Future<void> _saveForm() async {
     final _isValid = _form.currentState.validate();
     if (!_isValid) {
       return;
     }
     _form.currentState.save();
-    if (_editedProduct.id != null) {
-      Provider.of<Products>(context, listen: false)
-          .updateProduct(_editedProduct.id, _editedProduct);
-    } else {
-      Provider.of<Products>(context, listen: false).addProduct(_editedProduct);
-    }
+    setState(() {
+      _isLoading = true;
+    });
 
-    Navigator.of(context).pop();
+    if (_editedProduct.id != null) {
+      await Provider.of<Products>(context, listen: false)
+          .updateProduct(_editedProduct.id, _editedProduct);
+      setState(() {
+        _isLoading = false;
+      });
+      Navigator.of(context).pop();
+    } else {
+      try {
+        await Provider.of<Products>(context, listen: false)
+            .addProduct(_editedProduct);
+      } catch (e) {
+        await showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: Text('An Error Occured !'),
+            content: Text('Something went wrong'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   var _isInit = true;
+  var _isLoading = false;
   var _initValues = {
     'title': '',
     'description': '',
@@ -82,175 +113,177 @@ class _EditProductScreenState extends State<EditProductScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _form,
-          child: ListView(
-            children: [
-              TextFormField(
-                initialValue: _initValues['title'],
-                decoration: InputDecoration(
-                  labelText: 'Title',
-                ),
-                textInputAction: TextInputAction.next,
-                // onFieldSubmitted: (value) {
-                //   FocusScope.of(context).requestFocus()
-                // },
-                onSaved: (value) {
-                  print(value);
-                  _editedProduct = Product(
-                    title: value,
-                    price: _editedProduct.price,
-                    description: _editedProduct.description,
-                    id: _editedProduct.id,
-                    imageUrl: _editedProduct.imageUrl,
-                    isFavourite: _editedProduct.isFavourite,
-                  );
-                },
-                validator: (value) {
-                  if (value.isEmpty) return 'Please provide a value';
-                  return null;
-                },
-              ),
-              TextFormField(
-                initialValue: _initValues['price'],
-                decoration: InputDecoration(
-                  labelText: 'Price',
-                ),
-                textInputAction: TextInputAction.next,
-                keyboardType: TextInputType.number,
-                focusNode: _productFocusNode,
-                // onFieldSubmitted: (_) {
-                //   FocusScope.of(context).requestFocus(_descriptionFocusNode);
-                // },
-                onSaved: (value) {
-                  print(value);
-                  _editedProduct = Product(
-                    title: _editedProduct.title,
-                    price: double.parse(value),
-                    description: _editedProduct.description,
-                    id: _editedProduct.id,
-                    imageUrl: _editedProduct.imageUrl,
-                    isFavourite: _editedProduct.isFavourite,
-                  );
-                },
-                validator: (value) {
-                  if (value.isEmpty) {
-                    return 'Please enter a price';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please Enter a valid number';
-                  }
-                  if (double.parse(value) <= 0) {
-                    return 'Please enter a number greater than zero.';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                initialValue: _initValues['description'],
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                ),
-                // textInputAction: TextInputAction.next,
-                keyboardType: TextInputType.multiline,
-                // focusNode: _descriptionFocusNode,
-                onSaved: (value) {
-                  print(value);
-                  _editedProduct = Product(
-                    title: _editedProduct.title,
-                    price: _editedProduct.price,
-                    description: value,
-                    id: _editedProduct.id,
-                    imageUrl: _editedProduct.imageUrl,
-                    isFavourite: _editedProduct.isFavourite,
-                  );
-                },
-                validator: (value) {
-                  if (value.isEmpty) {
-                    return 'Please enter a description.';
-                  }
-                  if (value.length < 10) {
-                    return 'Should be at least 10 character long.';
-                  }
-                  return null;
-                },
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    margin: EdgeInsets.only(
-                      top: 8,
-                      right: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        width: 1,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    child: _imageUrlController.text.isEmpty
-                        ? Text('Enter a URL')
-                        : FittedBox(
-                            child: Image.network(
-                              _imageUrlController.text,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                  ),
-                  Expanded(
-                    child: TextFormField(
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _form,
+                child: ListView(
+                  children: [
+                    TextFormField(
+                      initialValue: _initValues['title'],
                       decoration: InputDecoration(
-                        labelText: 'Image URL',
+                        labelText: 'Title',
                       ),
-                      keyboardType: TextInputType.url,
-                      textInputAction: TextInputAction.done,
-                      controller: _imageUrlController,
-                      onEditingComplete: () {
-                        setState(() {});
+                      textInputAction: TextInputAction.next,
+                      // onFieldSubmitted: (value) {
+                      //   FocusScope.of(context).requestFocus()
+                      // },
+                      onSaved: (value) {
+                        print(value);
+                        _editedProduct = Product(
+                          title: value,
+                          price: _editedProduct.price,
+                          description: _editedProduct.description,
+                          id: _editedProduct.id,
+                          imageUrl: _editedProduct.imageUrl,
+                          isFavourite: _editedProduct.isFavourite,
+                        );
                       },
+                      validator: (value) {
+                        if (value.isEmpty) return 'Please provide a value';
+                        return null;
+                      },
+                    ),
+                    TextFormField(
+                      initialValue: _initValues['price'],
+                      decoration: InputDecoration(
+                        labelText: 'Price',
+                      ),
+                      textInputAction: TextInputAction.next,
+                      keyboardType: TextInputType.number,
+                      focusNode: _productFocusNode,
                       // onFieldSubmitted: (_) {
-                      //   _saveForm();
+                      //   FocusScope.of(context).requestFocus(_descriptionFocusNode);
                       // },
                       onSaved: (value) {
                         print(value);
                         _editedProduct = Product(
                           title: _editedProduct.title,
-                          price: _editedProduct.price,
+                          price: double.parse(value),
                           description: _editedProduct.description,
                           id: _editedProduct.id,
-                          imageUrl: value,
+                          imageUrl: _editedProduct.imageUrl,
                           isFavourite: _editedProduct.isFavourite,
                         );
                       },
                       validator: (value) {
                         if (value.isEmpty) {
-                          return 'Please enter an image URL';
+                          return 'Please enter a price';
                         }
-                        if (!value.startsWith('http') &&
-                            !value.startsWith('https')) {
-                          return 'Please enter a valid URL.';
+                        if (double.tryParse(value) == null) {
+                          return 'Please Enter a valid number';
                         }
-                        if (!value.endsWith('.png') &&
-                            !value.endsWith('.jpg') &&
-                            !value.endsWith('.jpeg')) {
-                          return 'Please enter a valid image URL.';
+                        if (double.parse(value) <= 0) {
+                          return 'Please enter a number greater than zero.';
                         }
                         return null;
                       },
                     ),
-                  ),
-                ],
-              )
-            ],
-          ),
-        ),
-      ),
+                    TextFormField(
+                      initialValue: _initValues['description'],
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Description',
+                      ),
+                      // textInputAction: TextInputAction.next,
+                      keyboardType: TextInputType.multiline,
+                      // focusNode: _descriptionFocusNode,
+                      onSaved: (value) {
+                        print(value);
+                        _editedProduct = Product(
+                          title: _editedProduct.title,
+                          price: _editedProduct.price,
+                          description: value,
+                          id: _editedProduct.id,
+                          imageUrl: _editedProduct.imageUrl,
+                          isFavourite: _editedProduct.isFavourite,
+                        );
+                      },
+                      validator: (value) {
+                        if (value.isEmpty) {
+                          return 'Please enter a description.';
+                        }
+                        if (value.length < 10) {
+                          return 'Should be at least 10 character long.';
+                        }
+                        return null;
+                      },
+                    ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          margin: EdgeInsets.only(
+                            top: 8,
+                            right: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              width: 1,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          child: _imageUrlController.text.isEmpty
+                              ? Text('Enter a URL')
+                              : FittedBox(
+                                  child: Image.network(
+                                    _imageUrlController.text,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                        ),
+                        Expanded(
+                          child: TextFormField(
+                            decoration: InputDecoration(
+                              labelText: 'Image URL',
+                            ),
+                            keyboardType: TextInputType.url,
+                            textInputAction: TextInputAction.done,
+                            controller: _imageUrlController,
+                            onEditingComplete: () {
+                              setState(() {});
+                            },
+                            // onFieldSubmitted: (_) {
+                            //   _saveForm();
+                            // },
+                            onSaved: (value) {
+                              print(value);
+                              _editedProduct = Product(
+                                title: _editedProduct.title,
+                                price: _editedProduct.price,
+                                description: _editedProduct.description,
+                                id: _editedProduct.id,
+                                imageUrl: value,
+                                isFavourite: _editedProduct.isFavourite,
+                              );
+                            },
+                            validator: (value) {
+                              if (value.isEmpty) {
+                                return 'Please enter an image URL';
+                              }
+                              if (!value.startsWith('http') &&
+                                  !value.startsWith('https')) {
+                                return 'Please enter a valid URL.';
+                              }
+                              if (!value.endsWith('.png') &&
+                                  !value.endsWith('.jpg') &&
+                                  !value.endsWith('.jpeg')) {
+                                return 'Please enter a valid image URL.';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
     );
   }
 }
